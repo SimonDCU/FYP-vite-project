@@ -62,7 +62,7 @@ function createSphere() {
     new THREE.MeshPhongMaterial({
       map: earthTexture,
       bumpMap: bumpTexture,
-      bumpScale: 0.05,
+      bumpScale: 2,
       specularMap: specularTexture,
       specular: new THREE.Color('grey')
     })
@@ -70,7 +70,7 @@ function createSphere() {
 }
 
   var sphere = createSphere();
-  sphere.position.set(0, 0, 10);
+  // sphere.position.set(0, 0, 10);
   scene.add(sphere)
   
 // Sizes
