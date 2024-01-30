@@ -9,38 +9,6 @@ import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 // Scene
 const scene = new THREE.Scene();
 
-// Define start and end points for camera flight
-const startPoint = new THREE.Vector3(-50, -50, 200); // Example start point
-const endPoint = new THREE.Vector3(0, 20, 100); // Example end point
-
-// Timing variables for flight
-let flightDuration = 3000; // Duration of the flight in milliseconds
-let startTime = -1; // Start time of the flight
-
-
-
-// // Instantiate a loader
-// const loader = new OBJLoader();
-
-// // Load a resource (Skull model)
-// loader.load(
-//   // .obj filepath
-//   'assets/models/12140_Skull_v3_L2.obj',
-//   // Called when resource is loaded
-//   function (object) {
-//     object.rotateX(-1);
-//     scene.add(object);
-//   },
-//   // Called when loading is in progresses
-//   function (xhr) {
-//     console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-//   },
-//   // Called when loading has errors
-//   function (error) {
-//     console.log('An error happened');
-//   }
-// );
-
 
 // STL Loader
 const loader = new STLLoader();
@@ -65,36 +33,84 @@ const light = new THREE.DirectionalLight(0xffffff, 2);
 light.position.set(5, 3, 5);
 scene.add(light);
 
+
+// Default Camera Settings
+const defaultCameraPosition = new THREE.Vector3(0, 0, 200);
+const defaultCameraRotation = new THREE.Euler(0, 0, 0);
+
+
 // Camera
 const camera = new THREE.PerspectiveCamera(45, sizes.width / sizes.height);
-camera.position.z = 20; // This initial position might be overwritten
+// camera.position.z = 120; // This initial position might be overwritten
 
 
-// Camera Dolly
+// Camera Dolly (VR)
 const dolly = new THREE.Object3D();
-dolly.position.z = 35;
+dolly.position.z = 200;
 dolly.add( camera );
 scene.add( dolly );
 
-const dummyCam = new THREE.Object3D();
-camera.add( dummyCam );
+// const dummyCam = new THREE.Object3D();
+// camera.add( dummyCam );
+
+
+
+// Function to create a frame line
+function createFrameLine(start, end, color = 0xFFFFFF, thickness = 0.2) {
+  const length = start.distanceTo(end);
+  const middle = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+  const geometry = new THREE.CylinderGeometry(thickness, thickness, length, 8, 1, true);
+  const material = new THREE.MeshBasicMaterial({ color: color });
+  const line = new THREE.Mesh(geometry, material);
+  line.position.set(middle.x, middle.y, middle.z);
+  line.lookAt(end);
+  line.rotateX(Math.PI / 2);
+  return line;
+}
+// Create an array to store the edges
+const edgeVertices = [
+  new THREE.Vector3(-500, -500, -500),
+  new THREE.Vector3(500, -500, -500),
+  new THREE.Vector3(500, 500, -500),
+  new THREE.Vector3(-500, 500, -500),
+  new THREE.Vector3(-500, -500, 500),
+  new THREE.Vector3(500, -500, 500),
+  new THREE.Vector3(500, 500, 500),
+  new THREE.Vector3(-500, 500, 500)
+];
+// Lines for the cube
+const lines = [];
+lines.push(createFrameLine(edgeVertices[0], edgeVertices[1]));
+lines.push(createFrameLine(edgeVertices[1], edgeVertices[2]));
+lines.push(createFrameLine(edgeVertices[2], edgeVertices[3]));
+lines.push(createFrameLine(edgeVertices[3], edgeVertices[0]));
+lines.push(createFrameLine(edgeVertices[4], edgeVertices[5]));
+lines.push(createFrameLine(edgeVertices[5], edgeVertices[6]));
+lines.push(createFrameLine(edgeVertices[6], edgeVertices[7]));
+lines.push(createFrameLine(edgeVertices[7], edgeVertices[4]));
+lines.push(createFrameLine(edgeVertices[0], edgeVertices[4]));
+lines.push(createFrameLine(edgeVertices[1], edgeVertices[5]));
+lines.push(createFrameLine(edgeVertices[2], edgeVertices[6]));
+lines.push(createFrameLine(edgeVertices[3], edgeVertices[7]));
+
+// Add lines to the scene
+lines.forEach(line => {
+  scene.add(line);
+});
+
+
 
 
 // Renderer
 const canvas = document.querySelector(".webgl");
-const renderer = new THREE.WebGLRenderer({ canvas });
+const renderer = new THREE.WebGLRenderer({
+  canvas: canvas,
+  antialias: true // Enable anti-aliasing
+});
 renderer.setSize(sizes.width, sizes.height);
 renderer.xr.enabled = true;
 renderer.autoClear = true;
 document.body.appendChild(VRButton.createButton(renderer));
-
-
-
-// Controls
-const controls = new OrbitControls(camera, canvas);
-controls.enableDamping = false;
-controls.target.set(0, 0, 0);
-
 
 
 
@@ -108,49 +124,69 @@ window.addEventListener("resize", () => {
 });
 
 
+// Define a variable to store the camera's rotation
+const cameraRotation = new THREE.Euler();
 
+// Event listener for keydown events
+document.addEventListener('keydown', (event) => {
+  const speed = 10; // Adjust this value to control the camera movement speed
 
+  // Get the camera's current rotation
+  cameraRotation.copy(dolly.rotation);
 
-let isFlightEnabled = true; // Variable to track if flight is enabled
-
-// Add an event listener to the button
-document.getElementById('toggleFlight').addEventListener('click', () => {
-  isFlightEnabled = !isFlightEnabled; // Toggle the flight state
-});
-
-// Modify the updateFlight function
-function updateFlight() {
-  if (!isFlightEnabled) return; // Do not update if flight is disabled
-
-  // Calculate elapsed time and progress
-  let elapsed = Date.now() - startTime;
-  let progress = (elapsed % flightDuration) / flightDuration; // Looping progress
-
-  // Determine direction based on the half cycle
-  let isReturning = Math.floor(elapsed / flightDuration) % 2 === 1;
-
-  // Adjust progress based on direction
-  if (isReturning) {
-    progress = 1 - progress;
+  if (event.key === 'w') {
+    // Calculate the forward movement vector based on camera's rotation
+    const forward = new THREE.Vector3(0, 0, -1).applyEuler(cameraRotation);
+    dolly.position.add(forward.multiplyScalar(speed));
+  } else if (event.key === 's') {
+    // Calculate the backward movement vector based on camera's rotation
+    const backward = new THREE.Vector3(0, 0, 1).applyEuler(cameraRotation);
+    dolly.position.add(backward.multiplyScalar(speed));
+  } else if (event.key === 'a') {
+    // Calculate the left movement vector based on camera's rotation
+    const left = new THREE.Vector3(-1, 0, 0).applyEuler(cameraRotation);
+    dolly.position.add(left.multiplyScalar(speed));
+  } else if (event.key === 'd') {
+    // Calculate the right movement vector based on camera's rotation
+    const right = new THREE.Vector3(1, 0, 0).applyEuler(cameraRotation);
+    dolly.position.add(right.multiplyScalar(speed));
+  } else if (event.key === 'q') {
+    // Calculate the upward movement vector based on camera's rotation
+    const up = new THREE.Vector3(0, 1, 0).applyEuler(cameraRotation);
+    dolly.position.add(up.multiplyScalar(speed));
+  } else if (event.key === 'e') {
+    // Calculate the downward movement vector based on camera's rotation
+    const down = new THREE.Vector3(0, -1, 0).applyEuler(cameraRotation);
+    dolly.position.add(down.multiplyScalar(speed));
+  } else if (event.key === 'r') {
+    // Reset Camera Position and Rotation to deafualt
+    dolly.position.copy(defaultCameraPosition);
+    camera.rotation.copy(defaultCameraRotation);
   }
 
-  // Interpolate the position
-  camera.position.lerpVectors(startPoint, endPoint, progress);
-}
-
-// Listen for the VR session start event
-renderer.xr.addEventListener('sessionstart', () => {
-  camera.position.copy(startPoint); // Set the VR camera to the start point
 });
+
+// Event listener for arrow keys to adjust camera angle
+document.addEventListener('keydown', (event) => {
+  const rotateSpeed = 0.1; // Adjust this value to control the camera rotation speed
+
+  if (event.key === 'ArrowUp') {
+    camera.rotation.x += rotateSpeed;
+  } else if (event.key === 'ArrowDown') {
+    camera.rotation.x -= rotateSpeed;
+  } else if (event.key === 'ArrowLeft') {
+    camera.rotation.y += rotateSpeed;
+  } else if (event.key === 'ArrowRight') {
+    camera.rotation.y -= rotateSpeed;
+  }
+});
+
+
+
 
 // Animation Loop
 renderer.setAnimationLoop(() => {
-  // controls.update(); // Orbit controls turned off when flight path is active
-  updateFlight(); // Update the camera flight
   renderer.render(scene, camera);
 });
-
-// Start the flight
-startFlight();
 
 console.log("Main script loaded and executed.");
