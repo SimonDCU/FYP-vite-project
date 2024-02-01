@@ -42,7 +42,7 @@ const defaultCameraRotation = new THREE.Euler(0, 0, 0);
 // Camera
 const camera = new THREE.PerspectiveCamera(45, sizes.width / sizes.height);
 // camera.position.z = 120; // This initial position might be overwritten
-
+camera.fov = 100;
 
 // Camera Dolly (VR)
 const dolly = new THREE.Object3D();
@@ -112,10 +112,10 @@ renderer.xr.enabled = true;
 renderer.autoClear = true;
 document.body.appendChild(VRButton.createButton(renderer));
 
-let controls
-controls = new FlyControls( dolly, renderer.domElement );
+let controls = new FlyControls( dolly, renderer.domElement );
+controls.dragToLook = true;
 				// controls.movementSpeed = 2;
-				// controls.lookSpeed = 0.1;
+				controls.rollSpeed = 0.02;
 
 
 
