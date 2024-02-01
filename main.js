@@ -4,7 +4,6 @@ import { VRButton } from 'three/examples/jsm/webxr/VRButton';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { FlyControls } from 'three/examples/jsm/controls/FlyControls.js';
-import colonSTL from './assets/Colon/Colon_scaled_0_4_Cut_1.stl'
 
 
 // Scene
@@ -13,7 +12,7 @@ const scene = new THREE.Scene();
 
 // STL Loader
 const loader = new STLLoader();
-loader.load(colonSTL, function (geometry) {
+loader.load('/Colon_scaled_0_4_Cut_1.stl', function (geometry) {
     const material = new THREE.MeshPhongMaterial({ color: 0x00ff00, side: THREE.DoubleSide });
     const mesh = new THREE.Mesh(geometry, material);
     scene.add(mesh);
