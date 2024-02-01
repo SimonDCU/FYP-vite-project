@@ -13,7 +13,7 @@ const scene = new THREE.Scene();
 // STL Loader
 const loader = new STLLoader();
 loader.load('/FYP-vite-project/Colon_scaled_0_4_Cut_1.stl', function (geometry) {
-    const material = new THREE.MeshPhongMaterial({ color: 0x00ff00, side: THREE.DoubleSide });
+    const material = new THREE.MeshPhongMaterial({ color: 0xff8b9c, side: THREE.DoubleSide });
     const mesh = new THREE.Mesh(geometry, material);
     scene.add(mesh);
 });
