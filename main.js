@@ -5,6 +5,7 @@ import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { FlyControls } from 'three/examples/jsm/controls/FlyControls.js';
 
+let locationArr = [];
 
 // Scene
 const scene = new THREE.Scene();
@@ -49,9 +50,6 @@ const dolly = new THREE.Object3D();
 dolly.position.z = 200;
 dolly.add( camera );
 scene.add( dolly );
-
-// const dummyCam = new THREE.Object3D();
-// camera.add( dummyCam );
 
 
 
@@ -112,10 +110,13 @@ renderer.xr.enabled = true;
 renderer.autoClear = true;
 document.body.appendChild(VRButton.createButton(renderer));
 
+
+
+
 let controls = new FlyControls( dolly, renderer.domElement );
 controls.dragToLook = true;
-				// controls.movementSpeed = 2;
-				controls.rollSpeed = 0.02;
+				controls.movementSpeed = 0.5;
+				controls.rollSpeed = 0.0075;
 
 
 
@@ -129,66 +130,231 @@ window.addEventListener("resize", () => {
 });
 
 
-// // Define a variable to store the camera's rotation
-// const cameraRotation = new THREE.Euler();
 
-// // Event listener for keydown events
-// document.addEventListener('keydown', (event) => {
-//   const speed = 10; // Adjust this value to control the camera movement speed
 
-//   // Get the camera's current rotation
-//   cameraRotation.copy(dolly.rotation);
+let pointObjects = [];
+let lastPointPosition = null; // Variable to keep track of the last point's position
 
-//   if (event.key === 'w') {
-//     // Calculate the forward movement vector based on camera's rotation
-//     const forward = new THREE.Vector3(0, 0, -1).applyEuler(cameraRotation);
-//     dolly.position.add(forward.multiplyScalar(speed));
-//   } else if (event.key === 's') {
-//     // Calculate the backward movement vector based on camera's rotation
-//     const backward = new THREE.Vector3(0, 0, 1).applyEuler(cameraRotation);
-//     dolly.position.add(backward.multiplyScalar(speed));
-//   } else if (event.key === 'a') {
-//     // Calculate the left movement vector based on camera's rotation
-//     const left = new THREE.Vector3(-1, 0, 0).applyEuler(cameraRotation);
-//     dolly.position.add(left.multiplyScalar(speed));
-//   } else if (event.key === 'd') {
-//     // Calculate the right movement vector based on camera's rotation
-//     const right = new THREE.Vector3(1, 0, 0).applyEuler(cameraRotation);
-//     dolly.position.add(right.multiplyScalar(speed));
-//   } else if (event.key === 'q') {
-//     // Calculate the upward movement vector based on camera's rotation
-//     const up = new THREE.Vector3(0, 1, 0).applyEuler(cameraRotation);
-//     dolly.position.add(up.multiplyScalar(speed));
-//   } else if (event.key === 'e') {
-//     // Calculate the downward movement vector based on camera's rotation
-//     const down = new THREE.Vector3(0, -1, 0).applyEuler(cameraRotation);
-//     dolly.position.add(down.multiplyScalar(speed));
-//   } else if (event.key === 'r') {
-//     // Reset Camera Position and Rotation to deafualt
-//     dolly.position.copy(defaultCameraPosition);
-//     camera.rotation.copy(defaultCameraRotation);
+document.addEventListener('keydown', (event) => {
+
+  // SET POINT
+  if (event.key === 'l') {
+    const currentPosition = new THREE.Vector3();
+    currentPosition.copy(dolly.position);
+    locationArr.push(currentPosition);
+
+    // Create the sphere for the current point
+    const sphereGeometry = new THREE.SphereGeometry(1, 32, 32);
+    const sphereMaterial = new THREE.MeshBasicMaterial({color: 0xff0000});
+    const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+    sphere.position.copy(currentPosition);
+    scene.add(sphere);
+    pointObjects.push(sphere);
+
+    // If there was a last point, draw a line from it to the current point
+    if (lastPointPosition) {
+      const lineMaterial = new THREE.LineBasicMaterial({color: 0xFFFFFF});
+      const lineGeometry = new THREE.BufferGeometry().setFromPoints([lastPointPosition, currentPosition]);
+      const line = new THREE.Line(lineGeometry, lineMaterial);
+      scene.add(line);
+
+      // Optionally, keep track of the line for future removal or manipulation
+      pointObjects.push(line);
+    }
+
+    // Update the last point position to the current position
+    lastPointPosition = currentPosition;
+  }
+
+
+
+  // CLEAR POINTS
+  if (event.key === 'c') {
+    // Clear logic for 'c'
+    locationArr = [];
+    pointObjects.forEach(obj => scene.remove(obj));
+    pointObjects = [];
+    lastPointPosition = null; // Reset last point position
+  }
+
+
+
+  // REMOVE LAST POINT
+  if (event.key === 'v') {
+    // Check if there are objects to remove
+    if (pointObjects.length > 0) {
+        // Remove the last object, which could be a line or a sphere
+        let lastObject = pointObjects.pop();
+        scene.remove(lastObject);
+
+        // If the last object was a line (assuming lines are added after spheres),
+        // then remove the next object in the array, which should be a sphere.
+        if (lastObject instanceof THREE.Line) {
+            if (pointObjects.length > 0) {
+                lastObject = pointObjects.pop();
+                scene.remove(lastObject);
+                locationArr.pop(); // Remove the corresponding location
+            }
+        } else {
+            // If the removed object was not a line, it was a sphere, so just remove the location
+            locationArr.pop();
+        }
+
+        // Update lastPointPosition to the position of the new last sphere, if any
+        if (pointObjects.length > 0) {
+            const lastSphere = pointObjects[pointObjects.length - 1];
+            if (lastSphere instanceof THREE.Mesh) { // Ensure the last object is indeed a sphere
+                lastPointPosition = lastSphere.position.clone();
+            } else {
+                // If the last object is not a sphere, reset lastPointPosition
+                lastPointPosition = null;
+            }
+        } else {
+            // If there are no objects left, reset lastPointPosition
+            lastPointPosition = null;
+        }
+        if (pointObjects.length > 0) {
+          // Find the last sphere in pointObjects for updating lastPointPosition
+          for (let i = pointObjects.length - 1; i >= 0; i--) {
+              if (pointObjects[i] instanceof THREE.Mesh) { // Assuming spheres are THREE.Mesh
+                  lastPointPosition = new THREE.Vector3().copy(pointObjects[i].position);
+                  break;
+              }
+          }
+      } else {
+          lastPointPosition = null;
+      }
+    }
+}
+
+
+
+// PRINT POINTS ARRAY TO CONSOLE
+if (event.key === 'p') {
+  console.log(locationArr);
+}
+
+
+});
+
+
+
+// Assume locationArr contains THREE.Vector3 objects for the path
+let curve; // Will hold the CatmullRomCurve3 based on locationArr
+let currentIndex = 0; // Track the current index position on the curve
+let curvePoints = []; // All points along the curve
+let numberofcurvePoints = 2000;
+
+// Function to initialize or reset the flight path
+function initializeFlightPath() {
+    if (locationArr.length > 1) {
+        curve = new THREE.CatmullRomCurve3(locationArr);
+        curvePoints = curve.getPoints(numberofcurvePoints); // Generate points along the curve
+
+        // Create TubeGeometry from the curve
+        const tubeGeometry = new THREE.TubeGeometry(curve, 1000, 0.2, 8, false);
+        const tubeMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.6 });
+        const tubeMesh = new THREE.Mesh(tubeGeometry, tubeMaterial);
+
+        // Remove the previous path visualization if it exists
+        if (window.currentPathMesh) {
+            scene.remove(window.currentPathMesh);
+        }
+        window.currentPathMesh = tubeMesh; // Store the current path mesh to be able to remove it later
+
+        // Add the new path visualization to the scene
+        scene.add(tubeMesh);
+
+
+
+        currentIndex = 0; // Start at the beginning of the path
+        updateCameraToCurrentIndex(); // Update camera position to the start of the path
+    }
+}
+
+// Function to update camera position based on currentIndex
+function updateCameraToCurrentIndex() {
+    if (curvePoints.length > 0 && currentIndex >= 0 && currentIndex < curvePoints.length) {
+        dolly.position.copy(curvePoints[currentIndex]); // Moving camera location along flightpath
+
+        // Code to make the camera look in the direction where it is going (Best to have off in VR)
+        // if (currentIndex < curvePoints.length - 1) {
+        //     dolly.lookAt(curvePoints[currentIndex + 1]);
+        // } else if (currentIndex > 0) {
+        //     dolly.lookAt(curvePoints[currentIndex - 1]);
+        // }
+    }
+}
+
+let flightpathMode = false; // Flag to track if we're in flightpath mode
+// Define how many points to move per key press
+let flightpathSpeed = 10; // Adjust this value to make the movement faster or slower
+
+
+// Function to enable/disable FlyControls
+function toggleFlyControls(enable) {
+  if (controls) {
+      controls.enabled = enable;
+  }
+}
+
+// Function to hide red points
+function toggleVisibility(visible) {
+  pointObjects.forEach(obj => {
+      if (obj instanceof THREE.Mesh && obj.geometry instanceof THREE.SphereGeometry) {
+          obj.visible = visible;
+      }
+  });
+}
+
+
+// FLIGHTPATH CONTROLS
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+      flightpathMode = true; // Enter flightpath mode
+      initializeFlightPath(); // Initialize or reset flight path
+      toggleFlyControls(false); // Disable free movement controls
+      toggleVisibility(false); // Hide the spheres
+  }
+  else if (event.key === 'Escape') {
+      flightpathMode = false; // Exit flightpath mode
+      toggleFlyControls(true); // Re-enable free movement controls
+      toggleVisibility(true); // Show the spheres again
+  }
+  else if ((event.key.toLowerCase() === 'w' || event.key.toLowerCase() === 's') && flightpathMode) {
+    // Calculate direction and apply speed
+    const direction = event.key.toLowerCase() === 'w' ? 1 : -1;
+    currentIndex = Math.max(0, Math.min(curvePoints.length - 1, currentIndex + direction * flightpathSpeed));
+    updateCameraToCurrentIndex();
+}
+});
+
+
+
+
+// let t = 0; // Parameter to represent the position along the curve, ranges from 0 to 1
+// let speed = 0.0005; // Speed of movement along the curve
+
+// renderer.setAnimationLoop(() => {
+//   if (flightpathMode) {
+//       t += speed; // Move forward along the curve
+//       if (t > 1) t = 0; // Loop back to start if we reach the end
+
+//       let pos = curve.getPointAt(t); // Get the point at t
+//       dolly.position.copy(pos);
+
+//       let lookAtPos = curve.getPointAt((t + 0.01) % 1); // Look a little ahead on the curve
+//       dolly.lookAt(lookAtPos);
 //   }
 
+//   controls.update(1); // Update controls if needed
+//   renderer.render(scene, camera);
 // });
 
-// // Event listener for arrow keys to adjust camera angle
 // document.addEventListener('keydown', (event) => {
-//   const rotateSpeed = 0.1; // Adjust this value to control the camera rotation speed
-
-//   if (event.key === 'ArrowUp') {
-//     camera.rotation.x += rotateSpeed;
-//   } else if (event.key === 'ArrowDown') {
-//     camera.rotation.x -= rotateSpeed;
-//   } else if (event.key === 'ArrowLeft') {
-//     camera.rotation.y += rotateSpeed;
-//   } else if (event.key === 'ArrowRight') {
-//     camera.rotation.y -= rotateSpeed;
-//   }
+//   if (event.key.toLowerCase() === 'w') speed += 0.0001; // Increase speed
+//   if (event.key.toLowerCase() === 's') speed -= 0.0001; // Decrease speed
 // });
-
-
-
-
 
 // Animation Loop
 renderer.setAnimationLoop(() => {
